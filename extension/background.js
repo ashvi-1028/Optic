@@ -31,3 +31,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   }
 });
+
+// Background fetch helper so content scripts can request external analysis (avoids mixed-content)
+chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+  if (message?.type === 'optic_fetch') {
+    const { url, method = 'GET', body } = message;
+    try {
+      const resp = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const json = await resp.json();
+      sendResponse({ ok: true, json });
+    } catch (err) {
+      console.error('Background fetch failed', err);
+      sendResponse({ ok: false, error: String(err) });
+    }
+    // Keep the message channel open for async response
+    return true;
+  }
+});

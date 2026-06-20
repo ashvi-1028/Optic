@@ -2,11 +2,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'optic_show_notification') {
     const title = message.title || 'Optic Privacy Alert';
     const msg = message.message || 'Potential information leak detected.';
+    
+    // Try to create notification without icon (icon download can fail)
     if (chrome.notifications && typeof chrome.notifications.create === 'function') {
       try {
         chrome.notifications.create({
           type: 'basic',
-          iconUrl: chrome.runtime.getURL('icons/icon48.svg'),
           title,
           message: msg,
           priority: 2
@@ -17,7 +18,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     }
 
-    // Fallback: use badge as a lightweight indicator and log the message
+    // Fallback: use badge as a lightweight indicator
     try {
       chrome.action.setBadgeText({ text: '!' });
       chrome.action.setBadgeBackgroundColor({ color: '#f39c12' });
@@ -25,9 +26,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       setTimeout(() => {
         try { chrome.action.setBadgeText({ text: '' }); } catch (e) {}
       }, 6000);
+      console.log('Optic notification via badge:', msg);
     } catch (e) {
-      // As a last resort, log the message
-      console.warn('Notifications unavailable; fallback used. Message:', msg, e);
+      console.warn('Notifications unavailable. Message:', msg, e);
     }
   }
 });

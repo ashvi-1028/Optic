@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "With user permission, scans posts, captions, comments, and messages to highlight leaked personal information and suspicious phishing content.",
   "icons": {
-    "48": "icons/icon48.svg"
+    "48": "icons/icon48.png"
   },
   "permissions": ["storage", "notifications", "activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
@@ -25,7 +25,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["icons/icon48.svg"],
+      "resources": ["icons/icon48.png", "icons/icon48.svg"],
       "matches": ["<all_urls>"]
     }
   ]

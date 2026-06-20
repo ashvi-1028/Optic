@@ -79,6 +79,49 @@ linkInstagram.addEventListener('click', () => {
   openInstagramProfile();
 });
 
+// Test notification helper (sends to background)
+const testNotif = document.getElementById('test-notif');
+const testBanner = document.getElementById('test-banner');
+if (testNotif) {
+  testNotif.addEventListener('click', () => {
+    try {
+      chrome.runtime.sendMessage({
+        type: 'optic_show_notification',
+        title: 'Optic Test Notification',
+        message: 'This is a test notification from Optic.'
+      });
+    } catch (e) {
+      console.error('Failed to send test notification message', e);
+      alert('Unable to send test notification. Check extension permissions.');
+    }
+  });
+}
+
+if (testBanner) {
+  testBanner.addEventListener('click', async () => {
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tabs || !tabs[0]) {
+        alert('No active tab found to inject the test banner.');
+        return;
+      }
+      await chrome.tabs.sendMessage(tabs[0].id, {
+        type: 'optic_test_banner',
+        sample: {
+          items: [
+            { category: 'Routine leak', description: 'Caption suggests daily coffee routine.' },
+            { category: 'Social context leak', description: 'Comment: "can\'t believe you moved to NYC, miss you already".' }
+          ],
+          reason: 'Avoid sharing exact city names and predictable routines.'
+        }
+      });
+    } catch (err) {
+      console.error('Failed to send test banner message', err);
+      alert('Unable to send test banner. Is the content script active on this tab?');
+    }
+  });
+}
+
 requestPermission.addEventListener('click', async () => {
   try {
     const hasPermission = await chrome.permissions?.request?.({ origins: ['<all_urls>'] });

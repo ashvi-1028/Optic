@@ -324,4 +324,23 @@ function sendNotification(outcome) {
   });
 }
 
+// Listen for test banner messages from popup (used to trigger a sample banner)
+try {
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg && msg.type === 'optic_test_banner' && msg.sample) {
+      const containers = getPostContainers();
+      const target = containers && containers.length ? containers[0] : document.body;
+      try {
+        renderBanner(target, msg.sample);
+        sendResponse && sendResponse({ ok: true });
+      } catch (e) {
+        console.error('Failed to render test banner', e);
+        sendResponse && sendResponse({ ok: false, error: String(e) });
+      }
+    }
+  });
+} catch (e) {
+  console.warn('Runtime messaging not available in content script', e);
+}
+
 initializeOptic();

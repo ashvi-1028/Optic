@@ -1,0 +1,37 @@
+.optic-banner {
+  background: rgba(17, 24, 39, 0.96);
+  border: 1px solid rgba(56, 189, 248, 0.24);
+  border-radius: 10px;
+  color: #f8fafc;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.28);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.optic-banner strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: #38bdf8;
+}
+.optic-banner .optic-reason {
+  margin-bottom: 8px;
+  color: #e2e8f0;
+}
+.optic-banner .optic-summary,
+.optic-banner .optic-advice {
+  margin-bottom: 6px;
+}
+.optic-banner .optic-close {
+  background: transparent;
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.optic-banner .optic-close:hover {
+  background: rgba(56, 189, 248, 0.08);
+}

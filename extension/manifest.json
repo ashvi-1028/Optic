@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Optic Privacy Guard",
+  "version": "0.1.0",
+  "description": "With user permission, scans posts, captions, comments, and messages to highlight leaked personal information and suspicious phishing content.",
+  "permissions": ["storage", "notifications", "activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Optic Privacy Guard"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

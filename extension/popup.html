@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Optic Privacy Guard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 16px; width: 320px; background: #121212; color: #f2f2f2; }
+    h1 { font-size: 18px; margin-bottom: 12px; }
+    label { display: block; margin: 12px 0 4px; font-weight: 600; }
+    button { width: 100%; margin-top: 16px; padding: 10px; border: none; border-radius: 8px; background: #10a37f; color: white; font-size: 14px; cursor: pointer; }
+    button:hover { background: #0f8a6a; }
+    .note { font-size: 12px; line-height: 1.5; color: #b8b8b8; margin-top: 10px; }
+    .toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
+    input[type=checkbox] { transform: scale(1.1); }
+  </style>
+</head>
+<body>
+  <h1>Optic Privacy Guard</h1>
+  <div class="toggle">
+    <span>Scan image/video posts</span>
+    <input id="scan-content" type="checkbox" />
+  </div>
+  <div class="toggle">
+    <span>Scan comments</span>
+    <input id="scan-comments" type="checkbox" />
+  </div>
+  <div class="toggle">
+    <span>Scan suspicious DMs</span>
+    <input id="scan-messages" type="checkbox" />
+  </div>
+  <button id="request-permission">Request page access</button>
+  <div class="note">Optic only scans pages you permit and highlights personal data leaks, location clues, routines, brands, and suspicious AI-style phishing text.</div>
+  <script src="popup.js"></script>
+</body>
+</html>

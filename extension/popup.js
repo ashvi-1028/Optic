@@ -14,12 +14,23 @@ const defaultSettings = {
 };
 
 function saveSettings() {
-  chrome.storage.local.set({ opticSettings: {
+  const settings = {
     scanContent: scanContent.checked,
     scanComments: scanComments.checked,
     scanMessages: scanMessages.checked,
     instagramHandle: instagramHandle.value || null
-  }});
+  };
+  try {
+    chrome.storage.local.set({ opticSettings: settings }, () => {
+      try {
+        chrome.runtime.sendMessage({ type: 'settingsUpdated', settings });
+      } catch (e) {
+        // ignore
+      }
+    });
+  } catch (error) {
+    console.error('Failed to save settings:', error);
+  }
 }
 
 function loadSettings() {

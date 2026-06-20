@@ -14,6 +14,17 @@ function initializeOptic() {
   chrome.storage.local.get(['opticSettings'], (result) => {
     opticSettings = result.opticSettings || defaultSettings;
   });
+  // Keep settings in sync when popup or other contexts update storage
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.opticSettings) {
+        opticSettings = changes.opticSettings.newValue || defaultSettings;
+      }
+    });
+  } catch (e) {
+    // Some environments may not expose storage events; fall back to messaging
+    console.warn('storage.onChanged not available in this context', e);
+  }
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'settingsUpdated') {
       opticSettings = message.settings || defaultSettings;

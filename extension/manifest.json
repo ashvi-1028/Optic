@@ -3,6 +3,9 @@
   "name": "Optic Privacy Guard",
   "version": "0.1.0",
   "description": "With user permission, scans posts, captions, comments, and messages to highlight leaked personal information and suspicious phishing content.",
+  "icons": {
+    "48": "icons/icon48.svg"
+  },
   "permissions": ["storage", "notifications", "activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": {

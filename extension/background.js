@@ -2,12 +2,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'optic_show_notification') {
     const title = message.title || 'Optic Privacy Alert';
     const msg = message.message || 'Potential information leak detected.';
+    const iconUrl = chrome.runtime.getURL('icons/icon48.svg');
     
-    // Try to create notification without icon (icon download can fail)
+    // Create a notification with the required icon and text properties.
     if (chrome.notifications && typeof chrome.notifications.create === 'function') {
       try {
         chrome.notifications.create({
           type: 'basic',
+          iconUrl,
           title,
           message: msg,
           priority: 2

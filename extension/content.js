@@ -1,7 +1,309 @@
 const OPTIC_ID = 'optic-privacy-guard-banner';
+const OPTIC_BLUR_MODAL_ID = 'optic-blur-modal';
 const defaultSettings = { scanContent: true, scanComments: true, scanMessages: true };
 let opticSettings = { ...defaultSettings };
 let seenContainers = new WeakSet();
+
+// ===== IMAGE BLURRING UTILITIES =====
+function blurImageRegion(canvas, x, y, width, height, blurRadius = 15) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return false;
+  
+  // Get the image data for the region
+  const imageData = ctx.getImageData(x, y, width, height);
+  const data = imageData.data;
+  
+  // Apply Gaussian-like blur
+  const pixelArray = [];
+  for (let i = 0; i < data.length; i += 4) {
+    pixelArray.push({
+      r: data[i],
+      g: data[i + 1],
+      b: data[i + 2],
+      a: data[i + 3]
+    });
+  }
+  
+  // Simple box blur
+  for (let i = 0; i < blurRadius; i++) {
+    for (let j = 0; j < pixelArray.length; j++) {
+      const neighbors = [];
+      const cols = width;
+      const row = Math.floor(j / cols);
+      const col = j % cols;
+      
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const ny = row + dy;
+          const nx = col + dx;
+          if (nx >= 0 && nx < cols && ny >= 0 && ny < (height)) {
+            const idx = ny * cols + nx;
+            if (idx < pixelArray.length) neighbors.push(pixelArray[idx]);
+          }
+        }
+      }
+      
+      if (neighbors.length > 0) {
+        const avgR = Math.round(neighbors.reduce((s, p) => s + p.r, 0) / neighbors.length);
+        const avgG = Math.round(neighbors.reduce((s, p) => s + p.g, 0) / neighbors.length);
+        const avgB = Math.round(neighbors.reduce((s, p) => s + p.b, 0) / neighbors.length);
+        pixelArray[j] = { r: avgR, g: avgG, b: avgB, a: pixelArray[j].a };
+      }
+    }
+  }
+  
+  // Write blurred pixels back
+  for (let i = 0; i < pixelArray.length; i++) {
+    data[i * 4] = pixelArray[i].r;
+    data[i * 4 + 1] = pixelArray[i].g;
+    data[i * 4 + 2] = pixelArray[i].b;
+    data[i * 4 + 3] = pixelArray[i].a;
+  }
+  
+  ctx.putImageData(imageData, x, y);
+  return true;
+}
+
+function createBlurModal(imageElement, risks) {
+  // Remove existing modal if any
+  const existing = document.getElementById(OPTIC_BLUR_MODAL_ID);
+  if (existing) existing.remove();
+  
+  const modal = document.createElement('div');
+  modal.id = OPTIC_BLUR_MODAL_ID;
+  modal.className = 'optic-blur-modal-overlay';
+  
+  const risksList = risks.map(r => `<li>${r.category}: ${r.description}</li>`).join('');
+  
+  modal.innerHTML = `
+    <div class="optic-blur-modal">
+      <div class="optic-modal-header">
+        <h3>🎨 Blur Sensitive Information</h3>
+        <button class="optic-modal-close" aria-label="Close">✕</button>
+      </div>
+      
+      <div class="optic-modal-content">
+        <p><strong>Detected privacy risks:</strong></p>
+        <ul style="font-size: 12px; color: #d1d5db;">${risksList}</ul>
+        
+        <div class="optic-canvas-container">
+          <canvas id="optic-blur-canvas" style="max-width: 100%; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 8px; cursor: crosshair;"></canvas>
+          <div class="optic-canvas-guide">Click and drag to draw blur regions. Double-click to finish.</div>
+        </div>
+      </div>
+      
+      <div class="optic-modal-actions">
+        <button class="optic-btn-blur-all">Blur All Detected Areas</button>
+        <button class="optic-btn-download">⬇️ Download Blurred Image</button>
+        <button class="optic-btn-cancel">Cancel</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Setup canvas and drawing
+  const canvas = document.getElementById('optic-blur-canvas');
+  const ctx = canvas.getContext('2d');
+  let isDrawing = false;
+  let startX, startY;
+  
+  // Load image onto canvas
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    canvas.width = img.width > 600 ? 600 : img.width;
+    canvas.height = (img.height / img.width) * canvas.width;
+    const scaleX = canvas.width / img.width;
+    const scaleY = canvas.height / img.height;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    
+    // Store scaling for blur operations
+    canvas.dataset.scaleX = scaleX;
+    canvas.dataset.scaleY = scaleY;
+  };
+  
+  img.src = imageElement.src || imageElement.currentSrc;
+  
+  // Canvas drawing
+  canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    startX = (e.clientX - rect.left) / parseFloat(canvas.dataset.scaleX || 1);
+    startY = (e.clientY - rect.top) / parseFloat(canvas.dataset.scaleY || 1);
+    isDrawing = true;
+  });
+  
+  canvas.addEventListener('mousemove', (e) => {
+    if (!isDrawing) return;
+    const rect = canvas.getBoundingClientRect();
+    const currentX = (e.clientX - rect.left) / parseFloat(canvas.dataset.scaleX || 1);
+    const currentY = (e.clientY - rect.top) / parseFloat(canvas.dataset.scaleY || 1);
+    
+    // Redraw image
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      
+      // Draw preview rectangle
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+    };
+    img.src = imageElement.src || imageElement.currentSrc;
+  });
+  
+  canvas.addEventListener('mouseup', (e) => {
+    if (!isDrawing) return;
+    const rect = canvas.getBoundingClientRect();
+    const endX = (e.clientX - rect.left) / parseFloat(canvas.dataset.scaleX || 1);
+    const endY = (e.clientY - rect.top) / parseFloat(canvas.dataset.scaleY || 1);
+    
+    const x = Math.min(startX, endX);
+    const y = Math.min(startY, endY);
+    const width = Math.abs(endX - startX);
+    const height = Math.abs(endY - startY);
+    
+    if (width > 10 && height > 10) {
+      blurImageRegion(canvas, x, y, width, height);
+    }
+    isDrawing = false;
+  });
+  
+  // Modal buttons
+  modal.querySelector('.optic-modal-close').addEventListener('click', () => modal.remove());
+  modal.querySelector('.optic-btn-cancel').addEventListener('click', () => modal.remove());
+  
+  modal.querySelector('.optic-btn-blur-all').addEventListener('click', () => {
+    // Blur entire image with lower intensity as safeguard
+    blurImageRegion(canvas, 0, 0, canvas.width, canvas.height, 5);
+  });
+  
+  modal.querySelector('.optic-btn-download').addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = 'optic-blurred-image.png';
+    link.click();
+  });
+  
+  return modal;
+}
+
+// ===== PRE-PUBLISH DETECTION =====
+function detectComposeArea() {
+  // Instagram: look for compose button or modal
+  const instagramCompose = document.querySelector('[aria-label*="Create"]') || 
+                          document.querySelector('button:has-text("Create")') ||
+                          document.querySelector('[role="dialog"] input[type="file"]');
+  
+  // Generic: watch for file inputs in modals/forms
+  const genericFileInputs = document.querySelectorAll('input[type="file"]');
+  
+  return { instagram: !!instagramCompose, fileInputs: genericFileInputs };
+}
+
+function setupPrePublishScanner() {
+  // Monitor for file uploads
+  document.addEventListener('change', (e) => {
+    if (e.target.tagName === 'INPUT' && e.target.type === 'file') {
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        // Scan file after upload and show warning if needed
+        setTimeout(() => scanUploadedContent(e.target), 500);
+      }
+    }
+  });
+  
+  // Monitor post submit buttons
+  const observer = new MutationObserver(() => {
+    document.querySelectorAll('button').forEach(btn => {
+      if ((btn.textContent.includes('Post') || btn.textContent.includes('Share') || btn.textContent.includes('Tweet')) && 
+          !btn.dataset.opticListening) {
+        btn.dataset.opticListening = 'true';
+        btn.addEventListener('click', (e) => {
+          handlePrePublish(e);
+        });
+      }
+    });
+  });
+  
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+function scanUploadedContent(fileInput) {
+  // Get caption/text from nearby text inputs or contenteditable divs
+  const captionElements = document.querySelectorAll('textarea, [contenteditable="true"]');
+  let captionText = '';
+  
+  captionElements.forEach(el => {
+    if (el.offsetParent !== null) { // Check if visible
+      captionText += ' ' + (el.value || el.textContent);
+    }
+  });
+  
+  // Also check for image previews
+  const imageElements = document.querySelectorAll('img[src*="blob:"], img[class*="preview"]');
+  if (imageElements.length > 0) {
+    showPrePublishWarning(imageElements[0], captionText);
+  }
+}
+
+function showPrePublishWarning(imageElement, captionText) {
+  // Analyze caption and image for risks
+  const risks = [];
+  analyzeTextForRisks(captionText, risks);
+  
+  if (risks.length > 0) {
+    // Show the blur modal
+    createBlurModal(imageElement, risks);
+  }
+}
+
+function handlePrePublish(event) {
+  // Check if form contains images and text
+  const form = event.target.closest('form') || document.activeElement.closest('form');
+  const images = form ? form.querySelectorAll('img') : [];
+  const textElements = form ? form.querySelectorAll('textarea, [contenteditable="true"]') : [];
+  
+  let text = '';
+  textElements.forEach(el => {
+    text += ' ' + (el.value || el.textContent);
+  });
+  
+  if (images.length > 0 && text.length > 0) {
+    // Analyze the content
+    analyzeForPublish(images[0], text, event);
+  }
+}
+
+function analyzeForPublish(imageElement, captionText, originalEvent) {
+  const risks = [];
+  
+  // Run text detection
+  analyzeTextForRisks(captionText, risks);
+  
+  if (risks.length > 0) {
+    originalEvent.preventDefault();
+    originalEvent.stopPropagation();
+    
+    // Show blur modal
+    createBlurModal(imageElement, risks);
+  }
+}
+
+function analyzeTextForRisks(text, risksArray) {
+  // Reuse detection logic
+  const tempItems = [];
+  
+  detectCaptionLeaks(text, tempItems);
+  detectCommentLeaks(text, tempItems);
+  
+  if (detectSuspiciousMessage(text)) {
+    tempItems.push(detectSuspiciousMessage(text));
+  }
+  
+  risksArray.push(...tempItems);
+}
 
 function initializeOptic() {
   if (window.__OpticPrivacyGuardInitialized) return;
@@ -31,6 +333,9 @@ function initializeOptic() {
     }
   });
   setInterval(scanPageForLeaks, 4500);
+  
+  // Activate pre-publish detection
+  setupPrePublishScanner();
 }
 
 function scanPageForLeaks() {

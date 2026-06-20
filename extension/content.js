@@ -6,12 +6,17 @@ let seenContainers = new WeakSet();
 function initializeOptic() {
   if (window.__OpticPrivacyGuardInitialized) return;
   window.__OpticPrivacyGuardInitialized = true;
+  
+  // Check if on Instagram
+  const isInstagram = window.location.hostname.includes('instagram.com');
+  console.log('[Optic] Initialized on:', window.location.hostname, '| Instagram:', isInstagram);
+  
   chrome.storage.local.get(['opticSettings'], (result) => {
     opticSettings = result.opticSettings || defaultSettings;
   });
-  chrome.storage.onChanged.addListener((changes) => {
-    if (changes.opticSettings) {
-      opticSettings = changes.opticSettings.newValue || defaultSettings;
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'settingsUpdated') {
+      opticSettings = message.settings || defaultSettings;
     }
   });
   setInterval(scanPageForLeaks, 4500);
@@ -33,12 +38,36 @@ function scanPageForLeaks() {
 
 function getPostContainers() {
   const candidates = [];
-  document.querySelectorAll('article, [role="article"], section, [data-testid="post"], [data-testid="tweet"]')
-    .forEach((element) => {
-      if (element.offsetParent !== null) {
-        candidates.push(element);
-      }
-    });
+  // Instagram-specific, Twitter/X, Facebook, TikTok, and generic selectors
+  const selectors = [
+    // Instagram
+    'article[role="presentation"]',
+    'div[role="presentation"] > div > div > div',
+    'div[data-testid="post_container"]',
+    // Twitter/X
+    'article[data-testid="tweet"]',
+    'div[data-testid="tweet"]',
+    // Generic social media
+    'article',
+    '[role="article"]',
+    'section[data-testid="post"]',
+    'div[class*="post"]',
+    'div[class*="feed-item"]'
+  ];
+  
+  const seen = new Set();
+  selectors.forEach((selector) => {
+    try {
+      document.querySelectorAll(selector).forEach((element) => {
+        if (element.offsetParent !== null && !seen.has(element)) {
+          seen.add(element);
+          candidates.push(element);
+        }
+      });
+    } catch (e) {
+      console.warn('Selector error:', selector, e);
+    }
+  });
   return candidates;
 }
 
@@ -73,24 +102,53 @@ function analyzeContainer(container) {
 function collectText(container) {
   const textParts = [];
   const selectors = ['[data-testid="tweetText"]', '[data-testid="post-caption"]', '.caption', 'figcaption', 'p', 'span', 'div'];
-  selectors.forEach((selector) => {
-    container.querySelectorAll(selector).forEach((node) => {
-      const text = node.textContent?.trim();
-      if (text && text.length > 10) textParts.push(text);
+  try {
+    selectors.forEach((selector) => {
+      const nodes = container?.querySelectorAll?.(selector);
+      if (nodes) {
+        nodes.forEach((node) => {
+          const text = node?.textContent?.trim?.();
+          if (text && text.length > 10) textParts.push(text);
+        });
+      }
     });
-  });
+  } catch (error) {
+    console.warn('Error collecting text:', error);
+  }
   return textParts.join('\n');
 }
 
 function collectCommentText(container) {
   const comments = [];
-  const selectors = ['.comment', '.comments', '[data-testid="comment"]', '[data-testid="reply"]', '.reply'];
-  selectors.forEach((selector) => {
-    container.querySelectorAll(selector).forEach((node) => {
-      const text = node.textContent?.trim();
-      if (text && text.length > 10) comments.push(text);
+  const selectors = [
+    // Instagram
+    'span[data-testid="HtmlCommentCaption"]',
+    'h1 + div span',
+    'div[class*="comment"]',
+    // Generic
+    '.comment',
+    '.comments',
+    '[data-testid="comment"]',
+    '[data-testid="reply"]',
+    '.reply',
+    'div[class*="caption"]'
+  ];
+  
+  try {
+    selectors.forEach((selector) => {
+      const nodes = container?.querySelectorAll?.(selector);
+      if (nodes) {
+        nodes.forEach((node) => {
+          const text = node?.textContent?.trim?.();
+          if (text && text.length > 10 && !comments.includes(text)) {
+            comments.push(text);
+          }
+        });
+      }
     });
-  });
+  } catch (error) {
+    console.warn('Error collecting comments:', error);
+  }
   return comments;
 }
 
@@ -127,6 +185,13 @@ function detectVisualLeaks(media, textContent, items) {
         category: 'Local business leak',
         description: 'A visible store brand or cup design reveals the exact coffee shop or local business you visited.',
         example: 'A branded cup or storefront is visible in the image.'
+      });
+    }
+    if (/clock|time|watch|timestamp|13:|14:|15:/i.test(mediaItem.alt + ' ' + textContent)) {
+      items.push({
+        category: 'Time leak',
+        description: 'A visible clock or time indicator in the background reveals what time you posted, which can help predict your daily schedule.',
+        example: 'A clock, watch, or timestamp is visible in the image.'
       });
     }
   });
@@ -188,8 +253,8 @@ function detectSuspiciousMessage(textContent) {
   if (phishingPattern.test(textContent)) {
     return {
       category: 'Phishing risk',
-      description: 'A message appears personalized using details from your posts, which is a common tactic for AI-scraped scams.',
-      example: `Message contains personal details and asks for action: “${textContent}”.`
+      description: 'This message contains information that could be extracted from your posts. This is a chance that it could be AI-generated. A scammer or bot used details about your location and activities to personalize this phishing attempt.',
+      example: `Suspicious message: "${textContent}".`
     };
   }
   return null;
@@ -209,6 +274,9 @@ function generateAdvice(items) {
   }
   if (categories.has('Social context leak')) {
     advice.push('Comments can reveal personal transitions like a move; review comment privacy settings and remove overly revealing replies.');
+  }
+  if (categories.has('Time leak')) {
+    advice.push('Avoid posting photos with visible clocks or timestamps that reveal your daily schedule.');
   }
   if (categories.has('Phishing / scam signal') || categories.has('Phishing risk')) {
     advice.push('Do not click unsolicited links and verify the sender; this could be an AI-personalized scam.');

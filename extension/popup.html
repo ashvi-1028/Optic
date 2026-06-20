@@ -7,16 +7,24 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 0; padding: 16px; width: 320px; background: #121212; color: #f2f2f2; }
     h1 { font-size: 18px; margin-bottom: 12px; }
-    label { display: block; margin: 12px 0 4px; font-weight: 600; }
+    h2 { font-size: 14px; margin-top: 16px; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+    label { display: block; margin: 12px 0 4px; font-weight: 600; font-size: 13px; }
     button { width: 100%; margin-top: 16px; padding: 10px; border: none; border-radius: 8px; background: #10a37f; color: white; font-size: 14px; cursor: pointer; }
     button:hover { background: #0f8a6a; }
+    button.secondary { background: #444; margin-top: 8px; }
+    button.secondary:hover { background: #555; }
     .note { font-size: 12px; line-height: 1.5; color: #b8b8b8; margin-top: 10px; }
     .toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
     input[type=checkbox] { transform: scale(1.1); }
+    input[type=text] { width: 100%; padding: 8px; border: 1px solid #444; border-radius: 4px; background: #1a1a1a; color: #f2f2f2; font-size: 12px; box-sizing: border-box; }
+    .account-info { background: #1a1a1a; padding: 8px; border-radius: 4px; margin-top: 8px; font-size: 12px; }
+    .account-info strong { color: #10a37f; }
   </style>
 </head>
 <body>
   <h1>Optic Privacy Guard</h1>
+  
+  <h2>Scan Settings</h2>
   <div class="toggle">
     <span>Scan image/video posts</span>
     <input id="scan-content" type="checkbox" />
@@ -29,8 +37,15 @@
     <span>Scan suspicious DMs</span>
     <input id="scan-messages" type="checkbox" />
   </div>
+
+  <h2>Account Linking</h2>
+  <label for="instagram-handle">Instagram Handle (optional)</label>
+  <input id="instagram-handle" type="text" placeholder="@yourhandle" />
+  <div id="account-info" class="account-info" style="display:none;"></div>
+  <button class="secondary" id="link-instagram">Link Instagram Account</button>
+
   <button id="request-permission">Request page access</button>
-  <div class="note">Optic only scans pages you permit and highlights personal data leaks, location clues, routines, brands, and suspicious AI-style phishing text.</div>
+  <div class="note">Optic scans posts you permit and highlights personal data leaks, location clues, routines, brands, and suspicious AI-style phishing text. Account linking helps you track your privacy exposure over time.</div>
   <script src="popup.js"></script>
 </body>
 </html>

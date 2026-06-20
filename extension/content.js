@@ -9,9 +9,10 @@ function blurImageRegion(canvas, x, y, width, height, blurRadius = 15) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return false;
   
-  // Get the image data for the region
-  const imageData = ctx.getImageData(x, y, width, height);
-  const data = imageData.data;
+  try {
+    // Try to get image data - will fail if canvas is tainted (CORS)
+    const imageData = ctx.getImageData(x, y, width, height);
+    const data = imageData.data;
   
   // Apply Gaussian-like blur
   const pixelArray = [];
@@ -62,6 +63,11 @@ function blurImageRegion(canvas, x, y, width, height, blurRadius = 15) {
   
   ctx.putImageData(imageData, x, y);
   return true;
+  } catch (e) {
+    console.warn('Cannot blur image due to CORS restrictions:', e);
+    alert('⚠️ This image cannot be blurred due to Instagram security restrictions. Consider using your device\'s built-in photo editor to blur sensitive areas before uploading.');
+    return false;
+  }
 }
 
 function createBlurModal(imageElement, risks) {
@@ -111,6 +117,14 @@ function createBlurModal(imageElement, risks) {
   // Load image onto canvas
   const img = new Image();
   img.crossOrigin = 'anonymous';
+  img.onerror = () => {
+    // CORS error - Instagram images often have CORS restrictions
+    canvas.style.display = 'none';
+    const corsWarning = document.createElement('div');
+    corsWarning.style.cssText = 'background: rgba(243, 156, 18, 0.15); border: 1px solid #f39c12; padding: 12px; border-radius: 6px; margin: 12px 0; font-size: 12px; color: #fcd34d;';
+    corsWarning.innerHTML = '<strong>⚠️ Image CORS Restriction:</strong> This image is protected by Instagram\'s security policy. You can still view the detected risks below, but manual blur editing is unavailable for this image. Consider using your device\'s photo editor to blur sensitive areas.';
+    canvas.parentElement.insertBefore(corsWarning, canvas);
+  };
   img.onload = () => {
     canvas.width = img.width > 600 ? 600 : img.width;
     canvas.height = (img.height / img.width) * canvas.width;
@@ -121,6 +135,7 @@ function createBlurModal(imageElement, risks) {
     // Store scaling for blur operations
     canvas.dataset.scaleX = scaleX;
     canvas.dataset.scaleY = scaleY;
+    canvas.style.display = 'block';
   };
   
   img.src = imageElement.src || imageElement.currentSrc;
@@ -192,9 +207,7 @@ function createBlurModal(imageElement, risks) {
 // ===== PRE-PUBLISH DETECTION =====
 function detectComposeArea() {
   // Instagram: look for compose button or modal
-  const instagramCompose = document.querySelector('[aria-label*="Create"]') || 
-                          document.querySelector('button:has-text("Create")') ||
-                          document.querySelector('[role="dialog"] input[type="file"]');
+  const instagramCompose = document.querySelector('[aria-label*="Create"]');
   
   // Generic: watch for file inputs in modals/forms
   const genericFileInputs = document.querySelectorAll('input[type="file"]');
@@ -241,8 +254,24 @@ function scanUploadedContent(fileInput) {
     }
   });
   
-  // Also check for image previews
-  const imageElements = document.querySelectorAll('img[src*="blob:"], img[class*="preview"]');
+  // Instagram preview images can be:
+  // - img[src*="blob:"] (blob URLs)
+  // - img with class containing "preview" or "image"
+  // - imgs in modal/dialog
+  const modal = document.querySelector('[role="dialog"]');
+  let imageElements = [];
+  
+  if (modal) {
+    imageElements = Array.from(modal.querySelectorAll('img')).filter(img => 
+      img.offsetParent !== null && // visible
+      !img.src.includes('profile') &&
+      !img.src.includes('icon') &&
+      img.width > 150 && img.height > 150 // large enough to be post image
+    );
+  } else {
+    imageElements = Array.from(document.querySelectorAll('img[src*="blob:"], img[class*="preview"]'));
+  }
+  
   if (imageElements.length > 0) {
     showPrePublishWarning(imageElements[0], captionText);
   }
@@ -261,9 +290,27 @@ function showPrePublishWarning(imageElement, captionText) {
 
 function handlePrePublish(event) {
   // Check if form contains images and text
-  const form = event.target.closest('form') || document.activeElement.closest('form');
-  const images = form ? form.querySelectorAll('img') : [];
-  const textElements = form ? form.querySelectorAll('textarea, [contenteditable="true"]') : [];
+  const form = event.target.closest('form');
+  
+  // Instagram uses modals, not forms - check dialog/modal for images
+  const modal = event.target.closest('[role="dialog"]') || event.target.closest('[role="presentation"]');
+  
+  let images = [];
+  let textElements = [];
+  
+  if (form) {
+    images = Array.from(form.querySelectorAll('img'));
+    textElements = Array.from(form.querySelectorAll('textarea, [contenteditable="true"]'));
+  } else if (modal) {
+    // Instagram: look for image and caption in modal
+    images = Array.from(modal.querySelectorAll('img')).filter(img => 
+      img.offsetParent !== null && // visible
+      !img.src.includes('profile') && // not profile pic
+      !img.src.includes('icon') && // not icon
+      img.width > 100 && img.height > 100 // reasonable size
+    );
+    textElements = Array.from(modal.querySelectorAll('[contenteditable="true"]'));
+  }
   
   let text = '';
   textElements.forEach(el => {

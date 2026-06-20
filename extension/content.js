@@ -49,28 +49,28 @@ function scanPageForLeaks() {
 
 function getPostContainers() {
   const candidates = [];
-  // Instagram-specific, Twitter/X, Facebook, TikTok, and generic selectors
-  const selectors = [
-    // Instagram
-    'article[role="presentation"]',
-    'div[role="presentation"] > div > div > div',
-    'div[data-testid="post_container"]',
-    // Twitter/X
-    'article[data-testid="tweet"]',
-    'div[data-testid="tweet"]',
-    // Generic social media
-    'article',
-    '[role="article"]',
-    'section[data-testid="post"]',
-    'div[class*="post"]',
-    'div[class*="feed-item"]'
-  ];
-  
+  // Use platform selectors if available from platform-selectors.js
+  const host = window.location.hostname || '';
+  let selectors = null;
+  try {
+    if (window.OPTIC_PLATFORM_SELECTORS) {
+      if (host.includes('instagram.com')) selectors = window.OPTIC_PLATFORM_SELECTORS.instagram;
+      else if (host.includes('twitter.com') || host.includes('x.com')) selectors = window.OPTIC_PLATFORM_SELECTORS.twitter;
+      else selectors = window.OPTIC_PLATFORM_SELECTORS.generic;
+    }
+  } catch (e) {
+    selectors = null;
+  }
+
+  if (!selectors || !Array.isArray(selectors)) {
+    selectors = ['article', '[role="article"]', 'section[data-testid="post"]', 'div[class*="post"]', 'div[class*="feed-item"]'];
+  }
+
   const seen = new Set();
   selectors.forEach((selector) => {
     try {
       document.querySelectorAll(selector).forEach((element) => {
-        if (element.offsetParent !== null && !seen.has(element)) {
+        if (element && element.offsetParent !== null && !seen.has(element)) {
           seen.add(element);
           candidates.push(element);
         }

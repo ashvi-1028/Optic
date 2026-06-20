@@ -2,14 +2,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'optic_show_notification') {
     const title = message.title || 'Optic Privacy Alert';
     const msg = message.message || 'Potential information leak detected.';
-    const iconUrl = chrome.runtime.getURL('icons/icon48.svg');
     
-    // Create a notification with the required icon and text properties.
+    // Create a notification with required text properties
+    // Note: iconUrl with extension SVG can cause download errors in Chrome notifications
     if (chrome.notifications && typeof chrome.notifications.create === 'function') {
       try {
         chrome.notifications.create({
           type: 'basic',
-          iconUrl,
+          iconUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
           title,
           message: msg,
           priority: 2
